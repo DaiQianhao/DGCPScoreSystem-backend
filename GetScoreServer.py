@@ -11,12 +11,13 @@ from flask import Flask, request
 from flask_cors import CORS
 
 
+number_of_people = {"2020": 114514}
 refresh_from_accounts = {"2020": ("2020000005", "abcd1234")}
 create_exam_table = """CREATE TABLE `{0}-{1}` (
-  `id` int NOT NULL,
+  `uid` int NOT NULL,
   `grade` int NOT NULL,
   `class` int NOT NULL,
-  `username` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `username` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `chinese_score` float DEFAULT NULL,
   `chinese_rank` int DEFAULT NULL,
   `maths_score` float DEFAULT NULL,
@@ -46,7 +47,7 @@ create_exam_table = """CREATE TABLE `{0}-{1}` (
   `total_score` float DEFAULT NULL,
   `grade_rank` int DEFAULT NULL,
   `class_rank` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
+  PRIMARY KEY (`uid`),
   UNIQUE KEY `grade_UNIQUE` (`grade`),
   UNIQUE KEY `class_UNIQUE` (`class`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"""
@@ -57,20 +58,20 @@ exam_table_trigger = """CREATE DEFINER=`root`@`localhost` TRIGGER `{0}-{1}_BEFOR
     DECLARE uscore INT;
     DECLARE unum INT;
     DECLARE uclass INT;
-    DECLARE chinese_result CURSOR FOR SELECT `id`,`chinese_rank`,`chinese_score`,count(1) FROM `{0}-{1}` WHERE `chinese_score` <= new.chinese_score;
-	DECLARE maths_result CURSOR FOR SELECT `id`,`maths_rank`,`maths_score`,count(1) FROM `{0}-{1}` WHERE `maths_score` <= new.maths_score;
-	DECLARE english_result CURSOR FOR SELECT `id`,`english_rank`,`english_score`,count(1) FROM `{0}-{1}` WHERE `english_score` <= new.english_score;
-	DECLARE physics_result CURSOR FOR SELECT `id`,`physics_rank`,`physics_score`,count(1) FROM `{0}-{1}` WHERE `physics_score` <= new.physics_score;
-	DECLARE history_result CURSOR FOR SELECT `id`,`history_rank`,`history_score`,count(1) FROM `{0}-{1}` WHERE `history_score` <= new.history_score;
-	DECLARE chemistry_result CURSOR FOR SELECT `id`,`chemistry_rank`,`chemistry_score`,count(1) FROM `{0}-{1}` WHERE `chemistry_score` <= new.chemistry_score;
-	DECLARE geography_result CURSOR FOR SELECT `id`,`geography_rank`,`geography_score`,count(1) FROM `{0}-{1}` WHERE `geography_score` <= new.geography_score;
-	DECLARE biology_result CURSOR FOR SELECT `id`,`biology_rank`,`biology_score`,count(1) FROM `{0}-{1}` WHERE `biology_score` <= new.biology_score;
-	DECLARE politics_result CURSOR FOR SELECT `id`,`politics_rank`,`politics_score`,count(1) FROM `{0}-{1}` WHERE `politics_score` <= new.politics_score;
-	DECLARE pe_result CURSOR FOR SELECT `id`,`pe_rank`,`pe_score`,count(1) FROM `{0}-{1}` WHERE `pe_score` <= new.pe_score;
-	DECLARE music_result CURSOR FOR SELECT `id`,`music_rank`,`music_score`,count(1) FROM `{0}-{1}` WHERE `music_score` <= new.music_score;
-	DECLARE art_result CURSOR FOR SELECT `id`,`art_rank`,`art_score`,count(1) FROM `{0}-{1}` WHERE `art_score` <= new.art_score;
-	DECLARE computer_result CURSOR FOR SELECT `id`,`computer_rank`,`computer_score`,count(1) FROM `{0}-{1}` WHERE `computer_score` <= new.computer_score;
-	DECLARE grade_result CURSOR FOR SELECT `id`,`grade_rank`,`total_score`,`class`,count(1) FROM `{0}-{1}` WHERE `total_score` <= new.total_score;
+    DECLARE chinese_result CURSOR FOR SELECT `uid`,`chinese_rank`,`chinese_score`,count(1) FROM `{0}-{1}` WHERE `chinese_score` <= new.chinese_score;
+	DECLARE maths_result CURSOR FOR SELECT `uid`,`maths_rank`,`maths_score`,count(1) FROM `{0}-{1}` WHERE `maths_score` <= new.maths_score;
+	DECLARE english_result CURSOR FOR SELECT `uid`,`english_rank`,`english_score`,count(1) FROM `{0}-{1}` WHERE `english_score` <= new.english_score;
+	DECLARE physics_result CURSOR FOR SELECT `uid`,`physics_rank`,`physics_score`,count(1) FROM `{0}-{1}` WHERE `physics_score` <= new.physics_score;
+	DECLARE history_result CURSOR FOR SELECT `uid`,`history_rank`,`history_score`,count(1) FROM `{0}-{1}` WHERE `history_score` <= new.history_score;
+	DECLARE chemistry_result CURSOR FOR SELECT `uid`,`chemistry_rank`,`chemistry_score`,count(1) FROM `{0}-{1}` WHERE `chemistry_score` <= new.chemistry_score;
+	DECLARE geography_result CURSOR FOR SELECT `uid`,`geography_rank`,`geography_score`,count(1) FROM `{0}-{1}` WHERE `geography_score` <= new.geography_score;
+	DECLARE biology_result CURSOR FOR SELECT `uid`,`biology_rank`,`biology_score`,count(1) FROM `{0}-{1}` WHERE `biology_score` <= new.biology_score;
+	DECLARE politics_result CURSOR FOR SELECT `uid`,`politics_rank`,`politics_score`,count(1) FROM `{0}-{1}` WHERE `politics_score` <= new.politics_score;
+	DECLARE pe_result CURSOR FOR SELECT `uid`,`pe_rank`,`pe_score`,count(1) FROM `{0}-{1}` WHERE `pe_score` <= new.pe_score;
+	DECLARE music_result CURSOR FOR SELECT `uid`,`music_rank`,`music_score`,count(1) FROM `{0}-{1}` WHERE `music_score` <= new.music_score;
+	DECLARE art_result CURSOR FOR SELECT `uid`,`art_rank`,`art_score`,count(1) FROM `{0}-{1}` WHERE `art_score` <= new.art_score;
+	DECLARE computer_result CURSOR FOR SELECT `uid`,`computer_rank`,`computer_score`,count(1) FROM `{0}-{1}` WHERE `computer_score` <= new.computer_score;
+	DECLARE grade_result CURSOR FOR SELECT `uid`,`grade_rank`,`total_score`,count(1) FROM `{0}-{1}` WHERE `total_score` <= new.total_score;
     
     set new.total_score = 0;
     
@@ -489,11 +490,14 @@ class DBHelper:
 	def get_score(self, grade, examid, uid) -> dict:
 		try:
 			cursor = self.conn.cursor()
-			cursor.execute("SELECT * FROM `{0}-{1}` where `id`={2}".format(grade, examid, uid))
+			cursor.execute("SELECT * FROM `{0}-{1}` where `uid`={2}".format(grade, examid, uid))
+			scores = list(cursor.fetchone())
+			cursor.execute("SELECT count(1) FROM `{0}-{1}`".format(grade, examid))
+			scores.append(int(cursor.fetchone()[0]))  # 33位
 			result = {
 				"success": True,
 				"data": {
-					"scores": cursor.fetchone()
+					"scores": scores
 				}
 			}
 		except Exception as e:
@@ -513,7 +517,7 @@ class DBHelper:
 			cursor.execute(sqll)
 			self.conn.commit()
 		except Exception as e:
-			print("[Error] Add new score failed. ROOLBACK! Exception: " + str(e) + ", sql: " + sql)
+			print("[Error] Add new score failed. ROOLBACK! Exception: " + str(e) + ", sql: " + sqll)
 			self.conn.rollback()
 		finally:
 			cursor.close()
@@ -524,11 +528,11 @@ class DBHelper:
 		try:
 			cursor = self.conn.cursor()
 			cursor.execute("""INSERT INTO `scoresystem`.`exams`(`id`,`name`,`grade`,`examid`)VALUES(Null,'{0}',{1},{2});""".format(name, grade, examid))
-			print ("[Info] Insert exam in exams table success")
+			print("[Info] Insert exam in exams table success")
 			cursor.execute(create_exam_table.format(grade, examid))
-			print ("[Info] Create table`{0}-{1} in scoresystem schema`".format(grade, examid))
+			print("[Info] Create table`{0}-{1} in scoresystem schema`".format(grade, examid))
 			cursor.execute(exam_table_trigger.format(grade, examid))
-			print ("[Info] Add a trigger in table`{0}-{1}`".format(grade, examid))
+			print("[Info] Add a trigger in table`{0}-{1}`".format(grade, examid))
 			self.conn.commit()
 		except Exception as e:
 			print("[Error] Add a new exam failed. ROOLBACK! Exception: " + str(e))
@@ -578,7 +582,7 @@ class DGCPInfoGetter:
 			                               allow_redirects=False)
 			response_login.close()
 			if response_login.headers["Location"] == "/jjwtMobile/CasmCenter/login.jsp":
-				print ("[Error] Update " + grade + " exams list failed. Reason: Account id or password error. Account: " + str(account))
+				print("[Error] Update " + grade + " exams list failed. Reason: Account id or password error. Account: " + str(account))
 				continue
 			print("[Info] login in {0} success!".format(account[0]))
 			requests.post("http://www.dgcz.cn/jjwtMobile/role.htm",
@@ -592,12 +596,12 @@ class DGCPInfoGetter:
 			response_getscore.close()
 			exams = dbh.get_exams(grade)
 			if exams["success"] is not True:
-				print ("[Error] Update " + grade + " exams list failed. Reason: Get exams from database failed." + json.dumps(exams))
+				print("[Error] Update " + grade + " exams list failed. Reason: Get exams from database failed." + json.dumps(exams))
 				continue
 			examids = []
 			for exam in exams["data"]["exams"]:
 				examids.append(str(exam[3]))
-			print ("[Info] Show some info " + str(examids))
+			print("[Info] Show some info " + str(examids))
 
 			soup = BeautifulSoup(response_getscore.text, "html.parser")
 			for option in soup.find("form").find("div").find("select").findChildren("option"):
@@ -607,15 +611,16 @@ class DGCPInfoGetter:
 					print("[Info] Exam{0} was recorded.")
 					continue
 				dbh.add_exam(option.get_text(), grade, option.attrs["value"])
-				print ("[Info] Add a new exam success. name: {0}, grade:{1}, examid:{2}.".format(option.get_text(), grade, option.attrs["value"]))
-		print ("[Info] Check exam completed.")
+				print("[Info] Add a new exam success. name: {0}, grade:{1}, examid:{2}.".format(option.get_text(), grade, option.attrs["value"]))
+		print("[Info] Check exam completed.")
 
 
 	@classmethod
 	def check_sid_validity(cls, sid: str) -> dict:
 		try:
 			response = requests.post("http://www.dgcz.cn/jjwtMobile/role.htm",
-			                         headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid})
+			                         headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid},
+			                         allow_redirects=False)
 			response.close()
 		except Exception as e:
 			return {"success": False, "exception": e}
@@ -631,12 +636,18 @@ class DGCPInfoGetter:
 	@classmethod
 	def get_score(cls, sid: str, examid: int) -> dict:
 		try:
+			response_role = requests.post("http://www.dgcz.cn/jjwtMobile/role.htm",
+			                              headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid},
+			                              allow_redirects=False)
+			response_gces = requests.post("http://www.dgcz.cn/jjwtMobile/getclazzexamsub.htm",
+			                              headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid},
+			                              allow_redirects=False)
 			response_markscore = requests.post("http://www.dgcz.cn/jjwtMobile/getscore.htm",
 			                                   headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid},
 			                                   data={"exam": examid},
 			                                   allow_redirects=False)
 			response_markscore.close()
-			response_score = requests.get("http://www.dgcz.cn/jjwtMobile/getscore.htm",
+			response_score = requests.get("http://www.dgcz.cn/jjwtMobile/CasmCenter/stu/score.jsp",
 			                              headers={"User-Agent": cls.ua, "Cookie": "JSESSIONID=" + sid})
 			response_score.close()
 		except Exception as e:
@@ -647,10 +658,9 @@ class DGCPInfoGetter:
 		for tr in soup.find("tbody").findChildren("tr"):
 			name = tr.findChildren("td")[0].get_text()
 			t = tr.findChildren("td")[1].get_text()
-			score = float(t.get_text()) if t is not None else None
+			score = float(t) if t != "" else None
 			if name == "三总" or name == "九总":
 				continue
-
 			# 翻 译 转 录
 			if ("语文" in name) and score is not None:
 				result["chinese_score"] = score
@@ -734,7 +744,6 @@ class Server(threading.Thread):
 			token = request.values.get("token")
 			if token is None:
 				return json.dumps({"code": 1, "msg": "缺少token参数"})
-			self.logger.info(token)
 			return self.get_score(token)
 
 	def run(self) -> None:
@@ -791,12 +800,10 @@ class Server(threading.Thread):
 				self.logger.warning("[Warning] Falied to get user {0}'s score, examid: {1}".format(self.tokens[token]["uid"], examid))
 				raise score["exception"]
 			scores = score["data"]["scores"]
-			if len(scores) is None:  # 数据库没有，从学校获取数据
+			if scores is None:  # 数据库没有，从学校获取数据
 				self.get_score_from_school(token, examid)
 				scores = self.db.get_score(grade, examid, self.tokens[token]["uid"])["data"]["scores"]
-			result["exams"][examid] = {}
-			result["exams"][examid]["examinfo"] = {}
-			result["exams"][examid]["examinfo"]["name"] = exam_info[1]
+			result["exams"][examid] = {"examinfo": {"name": exam_info[1], "missing_number": number_of_people[grade] - scores[33]}}
 			result["exams"][examid]["scores"] = {}
 			if scores[4] != -1:  # chinese
 				result["exams"][examid]["scores"]["chinese"] = {"score": scores[4], "rank": scores[5]}
@@ -838,12 +845,13 @@ class Server(threading.Thread):
 		scores = DGCPInfoGetter.get_score(sid, examid)
 
 		# 伞兵操作
-		keys = ["id", "grade", "class", "username"] + scores["data"].keys()
-		values = ["Null", grade, 0, username] + scores["data"].values()
-		keys_str = json.dumps(keys).replace('"', '`')
-		values_str = json.dumps(values).replace('"Null"', 'Null')
+		keys = ["uid", "grade", "class", "username"] + list(scores["data"].keys())
+		values = [uid, grade, 0, username] + list(scores["data"].values())
+		keys_str = json.dumps(keys, ensure_ascii=False).replace('"', '`')[1:-1]
+		values_str = json.dumps(values, ensure_ascii=False)[1:-1]
 		sqll = "INSERT INTO `{0}-{1}` ({2})VALUES({3});".format(grade, examid, keys_str, values_str)
 		self.db.add_score(sqll)
+
 
 	def clear_token_from_uid(self, uid: str) -> bool:
 		self.lock.acquire()
@@ -899,6 +907,11 @@ class Console:
 					print("===========tokens============")
 					print(json.dumps(get_tokens(), ensure_ascii=False))
 					print("=============================")
+				else:
+					f = open("tokens.dump", "w")
+					json.dump(get_tokens(), f, ensure_ascii=False)
+					f.close()
+					print("tokens dump success!")
 
 	def progress_cmd(self, cmd: str):
 		args = cmd.split(" ")
@@ -917,6 +930,14 @@ class Console:
 			print("Debug mode on" if self.debug else "Debug mode off")
 		elif cmd == "checkexams":
 			DGCPInfoGetter.check_exams()
+		elif cmd == "load":
+			try:
+				f = open("tokens.dump", "r")
+				self.server.tokens = json.load(f)
+				f.close()
+				print("load tokens success!")
+			except FileNotFoundError:
+				pass
 		elif cmd == "exit":
 			dbh.exit()
 			exit(0)
