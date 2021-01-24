@@ -11,7 +11,7 @@ from flask import Flask, request
 from flask_cors import CORS
 
 
-number_of_people = {"2020": 114514}
+number_of_people = {"2020": 1303}
 refresh_from_accounts = {"2020": ("2020000005", "abcd1234")}
 create_exam_table = """CREATE TABLE `{0}-{1}` (
   `uid` int NOT NULL,
@@ -458,7 +458,7 @@ END"""
 class DBHelper:
 	def __init__(self, host, user, pw, schema):
 		self.login_info = (host, user, pw, schema)
-		self.conn = sql.connect(host, user, pw, schema)
+		self.conn = sql.connect(host=host, user=user, password=pw, database=schema)
 		self.lock = threading.Lock()
 
 	def reconnect(self):
@@ -466,7 +466,7 @@ class DBHelper:
 			self.conn.close()
 		except:
 			pass
-		self.conn = sql.connect(self.login_info[0], self.login_info[1], self.login_info[2], self.login_info[3])
+		self.conn = sql.connect(host=self.login_info[0], user=self.login_info[1], password=self.login_info[2], database=self.login_info[3])
 
 	def get_exams(self, grade) -> dict:
 		try:
@@ -491,15 +491,24 @@ class DBHelper:
 		try:
 			cursor = self.conn.cursor()
 			cursor.execute("SELECT * FROM `{0}-{1}` where `uid`={2}".format(grade, examid, uid))
-			scores = list(cursor.fetchone())
-			cursor.execute("SELECT count(1) FROM `{0}-{1}`".format(grade, examid))
-			scores.append(int(cursor.fetchone()[0]))  # 33位
-			result = {
-				"success": True,
-				"data": {
-					"scores": scores
+			row = cursor.fetchone()
+			if row is None:
+				result = {
+					"success": True,
+					"data": {
+						"scores": None
+					}
 				}
-			}
+			else:
+				scores = list(row)
+				cursor.execute("SELECT count(1) FROM `{0}-{1}`".format(grade, examid))
+				scores.append(int(cursor.fetchone()[0]))  # 33位
+				result = {
+					"success": True,
+					"data": {
+						"scores": scores
+					}
+				}
 		except Exception as e:
 			result = {
 				"success": False,
@@ -516,6 +525,7 @@ class DBHelper:
 			cursor = self.conn.cursor()
 			cursor.execute(sqll)
 			self.conn.commit()
+			print("[Info] Added a new score! sql:" + sqll)
 		except Exception as e:
 			print("[Error] Add new score failed. ROOLBACK! Exception: " + str(e) + ", sql: " + sqll)
 			self.conn.rollback()
@@ -747,7 +757,7 @@ class Server(threading.Thread):
 			return self.get_score(token)
 
 	def run(self) -> None:
-		self.app.run("0.0.0.0", 44444)
+		self.app.run("0.0.0.0", 10124)
 
 	def login(self, uid: str, password: str):
 		login_res = DGCPInfoGetter.login(uid, password)
